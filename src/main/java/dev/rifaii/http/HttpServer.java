@@ -1,36 +1,45 @@
 package dev.rifaii.http;
 
 import dev.rifaii.http.exception.ServerException;
-import dev.rifaii.http.exception.UnsupportedProtocolException;
+import dev.rifaii.http.exception.ServerExceptionHandler;
 
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
-import java.util.Scanner;
-import java.util.Set;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+
+import static dev.rifaii.http.spec.HttpStatusCode.OK;
+import static dev.rifaii.http.util.HttpResponseConstructor.constructHttpResponse;
+import static java.lang.System.Logger.Level.*;
 
 public class HttpServer {
 
-    private static final Set<String> SUPPORTED_PROTOCOLS = Set.of("HTTP/1.1");
     private final int port;
+    private final System.Logger LOGGER = System.getLogger(HttpServer.class.getName());
+
+    private final HttpRequestParser httpRequestParser;
+    private final HttpResponseBuilder httpResponseBuilder;
+    private final RequestDispatcher requestDispatcher;
 
     public HttpServer(int port) {
         this.port = port;
+        this.httpResponseBuilder = new HttpResponseBuilderImpl();
+        httpRequestParser = new DefaultHttpRequestParser();
+        this.requestDispatcher = new RequestDispatcher(Map.of("/", new DefaultHttpHandler()));
     }
 
     public void startListening() throws IOException {
         try (ServerSocket serverSocket = new ServerSocket(this.port)) {
-            System.out.println("Server listening on port " + this.port);
+            LOGGER.log(INFO, "Server listening on port " + this.port);
             while (true) {
                 try {
                     Socket clientSocket = serverSocket.accept();
-                    System.out.println("connection received from " + clientSocket.getInetAddress());
+                    LOGGER.log(INFO, "connection received from " + clientSocket.getInetAddress());
                     handleHttpConnectionAsync(clientSocket);
                 } catch (Exception e) {
-                    System.out.println("err");
+                    LOGGER.log(ERROR, "err");
                 }
             }
         }
@@ -39,44 +48,15 @@ public class HttpServer {
     private void handleHttpConnectionAsync(Socket clientSocket) {
         CompletableFuture.runAsync(() -> {
             try {
-                HttpRequest request = parseRequest(clientSocket.getInputStream());
-                System.out.println("req handled");
-                handleHttpResponse(clientSocket);
+                HttpRequest request = httpRequestParser.parse(clientSocket);
+                HttpResponse response = httpResponseBuilder.build(clientSocket.getOutputStream());
+
+                requestDispatcher.dispatch(request, response);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             } catch (ServerException e) {
-                try {
-                    clientSocket.getOutputStream().write("HTTP/1.1 505 Unsupported Version\r\n\r\n".getBytes());
-                } catch (IOException ex) {
-                    throw new RuntimeException(ex);
-                }
+                ServerExceptionHandler.handle(clientSocket);
             }
         });
-    }
-
-    private void handleHttpResponse(Socket clientSocket) {
-        try {
-            BufferedWriter out = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream(), StandardCharsets.UTF_8));
-            out.write("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n");
-            out.flush();
-            System.out.println("sent response");
-            out.close();
-        } catch (IOException e) {
-            System.out.println(e.getMessage());
-            throw new RuntimeException(e);
-        }
-
-    }
-
-    private HttpRequest parseRequest(InputStream inputStream) throws IOException {
-        Scanner scanner = new Scanner(inputStream, StandardCharsets.UTF_8);
-
-        String[] firstLine = scanner.nextLine().split(" ");
-        Method method = Method.valueOf(firstLine[0]);
-        if (!SUPPORTED_PROTOCOLS.contains(firstLine[2])) {
-            throw new UnsupportedProtocolException();
-        }
-
-        return new HttpRequestImpl(method, firstLine[1], Collections.emptyMap());
     }
 }

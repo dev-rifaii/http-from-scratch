@@ -1,4 +1,4 @@
-package dev.rifaii.http;
+package dev.rifaii.http.spec;
 
 public enum Method {
     GET,
