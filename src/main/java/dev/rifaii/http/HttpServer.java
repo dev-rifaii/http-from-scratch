@@ -7,9 +7,11 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
+import static dev.rifaii.http.spec.HttpStatusCode.BAD_REQUEST;
 import static dev.rifaii.http.spec.HttpStatusCode.OK;
 import static dev.rifaii.http.util.HttpResponseConstructor.constructHttpResponse;
 import static java.lang.System.Logger.Level.*;
@@ -48,6 +50,13 @@ public class HttpServer {
     private void handleHttpConnectionAsync(Socket clientSocket) {
         CompletableFuture.runAsync(() -> {
             try {
+                var is = clientSocket.getInputStream();
+                if (is.available() == 0) {
+                    clientSocket.getOutputStream()
+                            .write(constructHttpResponse(BAD_REQUEST, Collections.emptyMap(), "Malformed request").getBytes());
+                    return;
+                }
+
                 HttpRequest request = httpRequestParser.parse(clientSocket);
                 HttpResponse response = httpResponseBuilder.build(clientSocket.getOutputStream());
 
@@ -56,6 +65,8 @@ public class HttpServer {
                 throw new RuntimeException(e);
             } catch (ServerException e) {
                 ServerExceptionHandler.handle(clientSocket);
+            } catch (Exception e) {
+                System.out.println("Global exception" + e.getMessage());
             }
         });
     }

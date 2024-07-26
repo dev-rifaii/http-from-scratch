@@ -15,8 +15,8 @@ public class HttpRequestImpl implements HttpRequest {
     private Map<String, String> headers;
     private Optional<String> body;
 
-    public HttpRequestImpl(Method method, String path, Map<String, String> headers) {
-        this(method, path, "HTTP/1.1", headers, null);
+    public HttpRequestImpl(Method method, String path, Map<String, String> headers, String body) {
+        this(method, path, "HTTP/1.1", headers, body);
     }
 
     public HttpRequestImpl(Method method, String path, String protocolVersion, Map<String, String> headers, String body) {
