@@ -11,6 +11,13 @@ public interface HttpRequest {
 
     String getPath();
 
+    /*
+     * Request path but includes query parameters
+     */
+    String getFullPath();
+
+    Map<String, String> getQueryParams();
+
     Method getMethod();
 
     InputStream getInputStream();

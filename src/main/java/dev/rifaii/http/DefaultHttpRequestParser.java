@@ -15,6 +15,7 @@ import java.util.*;
 
 public class DefaultHttpRequestParser implements HttpRequestParser {
 
+    private static final String QUERY_PARAMS_START_PREFIX = "?";
     private static final Set<String> SUPPORTED_PROTOCOLS = Set.of("HTTP/1.1");
 
     @Override
@@ -39,6 +40,28 @@ public class DefaultHttpRequestParser implements HttpRequestParser {
             line = in.readLine();
         }
 
-        return new HttpRequestImpl(method, rlTokens[1], headers);
+        String fullPath = rlTokens[1];
+        String path;
+        var queryParams = new HashMap<String, String>();
+
+        if (fullPath.contains(QUERY_PARAMS_START_PREFIX)) {
+            int queryParamsPrefixIndex = fullPath.indexOf(QUERY_PARAMS_START_PREFIX);
+            path = fullPath.substring(0, queryParamsPrefixIndex);
+            String[] queryParamTokens = fullPath.substring(queryParamsPrefixIndex + 1).split("&");
+            for (String queryParamToken : queryParamTokens) {
+                String[] queryParamKeyValue = queryParamToken.split("=");
+                queryParams.put(queryParamKeyValue[0], queryParamKeyValue[1]);
+            }
+        } else {
+            path = fullPath;
+        }
+
+        return new HttpRequestImpl(
+                method,
+                path,
+                fullPath,
+                headers,
+                queryParams
+        );
     }
 }
