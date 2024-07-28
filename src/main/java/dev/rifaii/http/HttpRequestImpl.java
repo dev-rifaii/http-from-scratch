@@ -13,18 +13,16 @@ public class HttpRequestImpl implements HttpRequest {
     private String path;
     private String protocolVersion;
     private Map<String, String> headers;
-    private Optional<String> body;
 
-    public HttpRequestImpl(Method method, String path, Map<String, String> headers, String body) {
-        this(method, path, "HTTP/1.1", headers, body);
+    public HttpRequestImpl(Method method, String path, Map<String, String> headers) {
+        this(method, path, "HTTP/1.1", headers);
     }
 
-    public HttpRequestImpl(Method method, String path, String protocolVersion, Map<String, String> headers, String body) {
+    public HttpRequestImpl(Method method, String path, String protocolVersion, Map<String, String> headers) {
         this.method = method;
         this.path = path;
         this.protocolVersion = protocolVersion;
         this.headers = headers;
-        this.body = null == body ? Optional.empty() : Optional.of(body);
     }
 
     public Method getMethod() {
@@ -54,7 +52,4 @@ public class HttpRequestImpl implements HttpRequest {
         return protocolVersion;
     }
 
-    public Optional<String> getBody() {
-        return body;
-    }
 }

@@ -5,6 +5,7 @@ import dev.rifaii.http.spec.Method;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Map;
+import java.util.Optional;
 
 public interface HttpRequest {
 
@@ -17,4 +18,5 @@ public interface HttpRequest {
     OutputStream getOutputStream();
 
     Map<String, String> getHeaders();
+
 }

@@ -39,55 +39,6 @@ public class DefaultHttpRequestParser implements HttpRequestParser {
             line = in.readLine();
         }
 
-//        String body = null;
-//        if (headers.get(HttpHeader.CONTENT_LENGTH.getHeaderName()) != null) {
-//            var sb = new StringBuilder();
-//
-//            while (scanner.hasNextLine()) {
-//                sb.append(scanner.nextLine());
-//            }
-//
-//            body = sb.toString();
-//        }
-
-        return new HttpRequestImpl(method, rlTokens[1], Collections.emptyMap(), null);
+        return new HttpRequestImpl(method, rlTokens[1], headers);
     }
-
-//    @Override
-//    public HttpRequest parse(Socket clientSocket) throws IOException {
-//        Scanner scanner = new Scanner(clientSocket.getInputStream(), StandardCharsets.UTF_8);
-//
-//        String[] rlTokens = scanner.nextLine().split(" ");
-//        Method method = Method.valueOf(rlTokens[0]);
-//
-//        if (!SUPPORTED_PROTOCOLS.contains(rlTokens[2])) {
-//            throw new UnsupportedProtocolException();
-//        }
-//
-//        Map<String, String> headers = new HashMap<>();
-//        String line = scanner.nextLine();
-//        while (line != null && !line.equals("\n") && !line.equals("\r\n") && !line.equals("\r") && !line.equals("")) {
-//            int colonIdx = line.indexOf(":");
-//
-//            if (colonIdx == -1) {
-//                throw new RequestParsingException("Failed to parse header on line " + line);
-//            }
-//            headers.put(line.substring(0, colonIdx), line.substring(colonIdx + 1, line.length()).trim());
-//            line = scanner.nextLine();
-//        }
-//
-//        String body = null;
-//        if (headers.get(HttpHeader.CONTENT_LENGTH.getHeaderName()) != null) {
-//            var sb = new StringBuilder();
-//
-//            while (scanner.hasNextLine()) {
-//                sb.append(scanner.nextLine());
-//            }
-//
-//            body = sb.toString();
-//        }
-//
-//        return new HttpRequestImpl(method, rlTokens[1], Collections.emptyMap(), body);
-//    }
-
 }

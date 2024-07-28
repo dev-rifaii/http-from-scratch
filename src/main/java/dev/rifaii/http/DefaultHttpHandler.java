@@ -14,7 +14,11 @@ public class DefaultHttpHandler implements HttpHandler {
     public void handle(HttpRequest request, HttpResponse response) {
         try {
             var out = new BufferedWriter(new OutputStreamWriter(response.getOutputStream(), StandardCharsets.UTF_8));
-            out.write(constructHttpResponse(OK, Map.of("Content-Type", "text/plain"), "BODY"));
+            out.write(constructHttpResponse(
+                OK,
+                Map.of("Content-Type", "text/plain"),
+                "TEST"
+            ));
             out.flush();
             out.close();
         } catch (IOException e) {

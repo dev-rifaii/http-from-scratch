@@ -6,13 +6,9 @@ import dev.rifaii.http.exception.ServerExceptionHandler;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.nio.charset.StandardCharsets;
-import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
-import static dev.rifaii.http.spec.HttpStatusCode.BAD_REQUEST;
-import static dev.rifaii.http.spec.HttpStatusCode.OK;
 import static dev.rifaii.http.util.HttpResponseConstructor.constructHttpResponse;
 import static java.lang.System.Logger.Level.*;
 
@@ -29,7 +25,7 @@ public class HttpServer {
         this.port = port;
         this.httpResponseBuilder = new HttpResponseBuilderImpl();
         httpRequestParser = new DefaultHttpRequestParser();
-        this.requestDispatcher = new RequestDispatcher(Map.of("/", new DefaultHttpHandler()));
+        this.requestDispatcher = new RequestDispatcherImpl(Map.of("/", new DefaultHttpHandler()));
     }
 
     public void startListening() throws IOException {
@@ -50,10 +46,9 @@ public class HttpServer {
     private void handleHttpConnectionAsync(Socket clientSocket) {
         CompletableFuture.runAsync(() -> {
             try {
-                var is = clientSocket.getInputStream();
-                if (is.available() == 0) {
-                    clientSocket.getOutputStream()
-                            .write(constructHttpResponse(BAD_REQUEST, Collections.emptyMap(), "Malformed request").getBytes());
+                if (clientSocket.getInputStream().available() == 0) {
+                    LOGGER.log(TRACE, () -> "closing connection due to empty input");
+                    clientSocket.close();
                     return;
                 }
 

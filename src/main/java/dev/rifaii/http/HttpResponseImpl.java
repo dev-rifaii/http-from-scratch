@@ -4,10 +4,10 @@ import dev.rifaii.http.spec.HttpStatusCode;
 
 import java.io.OutputStream;
 
-public class HttpResponseImpl implements HttpResponse {
+public final class HttpResponseImpl implements HttpResponse {
 
     private HttpStatusCode sc;
-    private OutputStream os;
+    private final OutputStream os;
 
     public HttpResponseImpl(OutputStream os) {
         this(os, null);
