@@ -16,7 +16,7 @@ import java.util.*;
 public class DefaultHttpRequestParser implements HttpRequestParser {
 
     private static final String QUERY_PARAMS_START_PREFIX = "?";
-    private static final Set<String> SUPPORTED_PROTOCOLS = Set.of("HTTP/1.1");
+    private static final String SUPPORTED_HTTP_VERSION = "HTTP/1.1";
 
     @Override
     public HttpRequest parse(Socket clientSocket) throws IOException {
@@ -24,13 +24,13 @@ public class DefaultHttpRequestParser implements HttpRequestParser {
 
         String[] rlTokens = in.readLine().split(" ");
         Method method = Method.valueOf(rlTokens[0]);
-        if (!SUPPORTED_PROTOCOLS.contains(rlTokens[2])) {
+        if (!SUPPORTED_HTTP_VERSION.equals(rlTokens[2])) {
             throw new UnsupportedProtocolException();
         }
 
         Map<String, String> headers = new HashMap<>();
         String line = in.readLine();
-        while (line != null && !line.equals("\n") && !line.equals("\r\n") && !line.equals("\r") && !line.equals("")) {
+        while (line != null && !line.isEmpty()) {
             int colonIdx = line.indexOf(":");
 
             if (colonIdx == -1) {

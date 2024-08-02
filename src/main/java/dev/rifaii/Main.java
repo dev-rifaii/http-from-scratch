@@ -6,7 +6,7 @@ import java.io.*;
 
 public class Main {
     public static void main(String[] args) throws IOException {
-        HttpServer httpServer = new HttpServer(8080);
+        HttpServer httpServer = new HttpServer();
         httpServer.startListening();
     }
 }

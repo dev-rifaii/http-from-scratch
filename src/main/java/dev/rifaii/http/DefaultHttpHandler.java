@@ -20,7 +20,7 @@ public class DefaultHttpHandler implements HttpHandler {
                 "TEST"
             ));
             out.flush();
-            out.close();
+//            out.close();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

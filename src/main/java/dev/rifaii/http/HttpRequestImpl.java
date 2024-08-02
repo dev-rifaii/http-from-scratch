@@ -67,4 +67,8 @@ public class HttpRequestImpl implements HttpRequest {
         return protocolVersion;
     }
 
+    @Override
+    public String getHeader(String name) {
+        return this.headers.get(name);
+    }
 }

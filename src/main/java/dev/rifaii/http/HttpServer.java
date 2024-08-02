@@ -2,11 +2,15 @@ package dev.rifaii.http;
 
 import dev.rifaii.http.exception.ServerException;
 import dev.rifaii.http.exception.ServerExceptionHandler;
+import dev.rifaii.http.spec.HttpHeader;
 
+import javax.swing.plaf.metal.MetalBorders.TableHeaderBorder;
+import javax.swing.text.html.Option;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 import static dev.rifaii.http.util.HttpResponseConstructor.constructHttpResponse;
@@ -20,6 +24,10 @@ public class HttpServer {
     private final HttpRequestParser httpRequestParser;
     private final HttpResponseBuilder httpResponseBuilder;
     private final RequestDispatcher requestDispatcher;
+
+    public HttpServer() {
+        this(80);
+    }
 
     public HttpServer(int port) {
         this.port = port;
@@ -56,6 +64,18 @@ public class HttpServer {
                 HttpResponse response = httpResponseBuilder.build(clientSocket.getOutputStream());
 
                 requestDispatcher.dispatch(request, response);
+
+                //probably needs to be changed
+                Optional.ofNullable(request.getHeader(HttpHeader.CONNECTION.name())).map("close"::equals)
+                    .ifPresent(shouldClose -> {
+                        try {
+                            clientSocket.getInputStream().close();
+                            clientSocket.getOutputStream().flush();
+                            clientSocket.close();
+                        } catch (IOException e) {
+                            LOGGER.log(ERROR, e);
+                        }
+                    });
             } catch (IOException e) {
                 throw new RuntimeException(e);
             } catch (ServerException e) {
