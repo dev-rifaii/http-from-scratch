@@ -3,6 +3,10 @@ package dev.rifaii.http;
 import dev.rifaii.http.exception.ServerException;
 import dev.rifaii.http.exception.ServerExceptionHandler;
 import dev.rifaii.http.spec.HttpHeader;
+import dev.rifaii.http.spec.HttpStatusCode;
+import dev.rifaii.http.spec.Method;
+import dev.rifaii.http.util.HttpResponseConstructor;
+import dev.rifaii.util.Pair;
 
 import javax.swing.plaf.metal.MetalBorders.TableHeaderBorder;
 import javax.swing.text.html.Option;
@@ -33,7 +37,7 @@ public class HttpServer {
         this.port = port;
         this.httpResponseBuilder = new HttpResponseBuilderImpl();
         httpRequestParser = new DefaultHttpRequestParser();
-        this.requestDispatcher = new RequestDispatcherImpl(Map.of("/", new DefaultHttpHandler()));
+        this.requestDispatcher = new RequestDispatcherImpl(Map.of(Pair.of("/", Method.POST), new DefaultHttpHandler()));
     }
 
     public void startListening() throws IOException {
@@ -61,21 +65,27 @@ public class HttpServer {
                 }
 
                 HttpRequest request = httpRequestParser.parse(clientSocket);
+
+                if (!requestDispatcher.routeExists(request.getPath(), request.getMethod())){
+                    var os = clientSocket.getOutputStream();
+                    os.write(HttpResponseConstructor.constructHttpResponse(HttpStatusCode.NOT_FOUND).getBytes());
+                    os.flush();
+                    clientSocket.close();
+                }
+
                 HttpResponse response = httpResponseBuilder.build(clientSocket.getOutputStream());
 
                 requestDispatcher.dispatch(request, response);
 
                 //probably needs to be changed
-                Optional.ofNullable(request.getHeader(HttpHeader.CONNECTION.name())).map("close"::equals)
-                    .ifPresent(shouldClose -> {
-                        try {
-                            clientSocket.getInputStream().close();
-                            clientSocket.getOutputStream().flush();
-                            clientSocket.close();
-                        } catch (IOException e) {
-                            LOGGER.log(ERROR, e);
-                        }
-                    });
+                if ("close".equals(request.getHeader(HttpHeader.CONNECTION.getHeaderName()))) {
+                    try {
+                        clientSocket.getOutputStream().close();
+                        clientSocket.close();
+                    } catch (IOException e) {
+                        LOGGER.log(ERROR, e);
+                    }
+                }
             } catch (IOException e) {
                 throw new RuntimeException(e);
             } catch (ServerException e) {

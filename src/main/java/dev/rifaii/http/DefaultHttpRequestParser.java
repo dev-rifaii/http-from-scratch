@@ -5,6 +5,7 @@ import dev.rifaii.http.spec.HttpHeader;
 import dev.rifaii.http.spec.Method;
 import dev.rifaii.http.exception.UnsupportedProtocolException;
 
+import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -12,6 +13,9 @@ import java.io.InputStreamReader;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+
+import static dev.rifaii.http.spec.HttpHeader.CONTENT_LENGTH;
+import static java.lang.Integer.parseInt;
 
 public class DefaultHttpRequestParser implements HttpRequestParser {
 
@@ -36,9 +40,17 @@ public class DefaultHttpRequestParser implements HttpRequestParser {
             if (colonIdx == -1) {
                 throw new RequestParsingException("Failed to parse header on line " + line);
             }
-            headers.put(line.substring(0, colonIdx), line.substring(colonIdx + 1, line.length()).trim());
+            headers.put(line.substring(0, colonIdx), line.substring(colonIdx + 1).trim());
             line = in.readLine();
         }
+
+        int bodyLength = Optional.ofNullable(headers.get(CONTENT_LENGTH.getHeaderName())).map(Integer::parseInt).orElse(0);
+        char[] body;
+        if (bodyLength != 0) {
+            body = new char[bodyLength];
+            in.read(body);
+        }
+
 
         String fullPath = rlTokens[1];
         String path;

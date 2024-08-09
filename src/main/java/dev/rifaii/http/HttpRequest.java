@@ -28,4 +28,6 @@ public interface HttpRequest {
 
     String getHeader(String name);
 
+    byte[] getBody();
+
 }

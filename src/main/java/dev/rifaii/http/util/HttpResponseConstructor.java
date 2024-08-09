@@ -2,13 +2,18 @@ package dev.rifaii.http.util;
 
 import dev.rifaii.http.spec.HttpStatusCode;
 
+import java.util.Collections;
 import java.util.Map;
 
 public class HttpResponseConstructor {
 
     private static final String DEFAULT_HTTP_PROTOCOL = "HTTP/1.1";
     private static final String CR_NL = "\r\n";
-    private static StringBuilder stringBuilder = new StringBuilder();
+    private static final StringBuilder stringBuilder = new StringBuilder();
+
+    public static String constructHttpResponse(HttpStatusCode sc) {
+        return constructHttpResponse(sc, Collections.emptyMap(), null);
+    }
 
     public static String constructHttpResponse(HttpStatusCode sc, Map<String, String> headers, String body) {
         return constructHttpResponse(DEFAULT_HTTP_PROTOCOL, sc, headers, body);
