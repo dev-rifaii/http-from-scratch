@@ -1,5 +1,6 @@
 package dev.rifaii.http.util;
 
+import dev.rifaii.http.spec.HttpHeader;
 import dev.rifaii.http.spec.HttpStatusCode;
 
 import java.util.Collections;
@@ -21,16 +22,20 @@ public class HttpResponseConstructor {
 
     public static String constructHttpResponse(String httpProtocol, HttpStatusCode sc, Map<String, String> headers, String body) {
         //e.g: "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nBody"
+        headers.put(HttpHeader.CONTENT_LENGTH.getHeaderName(), String.valueOf(body.length() + CR_NL.length()));
+        String headersMap = mapToHeaders(headers);
+
         stringBuilder.append(httpProtocol)
                 .append(" ")
                 .append("%s %s".formatted(sc.getCode(), sc.getDescription()))
                 .append(CR_NL)
 
-                .append(mapToHeaders(headers))
-                .append(CR_NL)
+                .append(headersMap)
                 .append(CR_NL)
 
-                .append(body);
+                .append(body)
+                .append(CR_NL)
+        ;
 
         String str = stringBuilder.toString();
         stringBuilder.setLength(0);
@@ -40,7 +45,7 @@ public class HttpResponseConstructor {
     private static String mapToHeaders(Map<String, String> headers) {
         StringBuilder sb = new StringBuilder();
         headers.forEach((key, val) -> {
-            sb.append("%s: %s".formatted(key, val));
+            sb.append("%s: %s%s".formatted(key, val, CR_NL));
         });
         return sb.toString();
     }

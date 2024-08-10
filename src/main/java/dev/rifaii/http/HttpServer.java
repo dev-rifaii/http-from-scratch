@@ -14,10 +14,8 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-import static dev.rifaii.http.util.HttpResponseConstructor.constructHttpResponse;
 import static java.lang.System.Logger.Level.*;
 
 public class HttpServer {
@@ -71,6 +69,7 @@ public class HttpServer {
                     os.write(HttpResponseConstructor.constructHttpResponse(HttpStatusCode.NOT_FOUND).getBytes());
                     os.flush();
                     clientSocket.close();
+                    return;
                 }
 
                 HttpResponse response = httpResponseBuilder.build(clientSocket.getOutputStream());
@@ -85,6 +84,8 @@ public class HttpServer {
                     } catch (IOException e) {
                         LOGGER.log(ERROR, e);
                     }
+                } else {
+                    clientSocket.setKeepAlive(true);
                 }
             } catch (IOException e) {
                 throw new RuntimeException(e);
