@@ -1,31 +1,33 @@
 package dev.rifaii.http;
 
+import dev.rifaii.http.exception.RequestParsingException;
 import dev.rifaii.http.exception.ServerException;
 import dev.rifaii.http.exception.ServerExceptionHandler;
+import dev.rifaii.http.exception.UnsupportedProtocolException;
 import dev.rifaii.http.spec.HttpHeader;
-import dev.rifaii.http.spec.HttpStatusCode;
 import dev.rifaii.http.spec.Method;
-import dev.rifaii.http.util.HttpResponseConstructor;
-import dev.rifaii.util.Pair;
 
-import javax.swing.plaf.metal.MetalBorders.TableHeaderBorder;
-import javax.swing.text.html.Option;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
+import static dev.rifaii.http.spec.HttpHeader.CONTENT_LENGTH;
+import static dev.rifaii.http.spec.HttpStatusCode.OK;
+import static dev.rifaii.http.util.HttpResponseConstructor.constructHttpResponse;
 import static java.lang.System.Logger.Level.*;
 
 public class HttpServer {
 
+    private static final String QUERY_PARAMS_START_PREFIX = "?";
+    private static final String SUPPORTED_HTTP_VERSION = "HTTP/1.1";
+
     private final int port;
     private final System.Logger LOGGER = System.getLogger(HttpServer.class.getName());
-
-    private final HttpRequestParser httpRequestParser;
-    private final HttpResponseBuilder httpResponseBuilder;
-    private final RequestDispatcher requestDispatcher;
 
     public HttpServer() {
         this(80);
@@ -33,9 +35,6 @@ public class HttpServer {
 
     public HttpServer(int port) {
         this.port = port;
-        this.httpResponseBuilder = new HttpResponseBuilderImpl();
-        httpRequestParser = new DefaultHttpRequestParser();
-        this.requestDispatcher = new RequestDispatcherImpl(Map.of(Pair.of("/", Method.POST), new DefaultHttpHandler()));
     }
 
     public void startListening() throws IOException {
@@ -45,7 +44,7 @@ public class HttpServer {
                 try {
                     Socket clientSocket = serverSocket.accept();
                     LOGGER.log(INFO, "connection received from " + clientSocket.getInetAddress());
-                    handleHttpConnectionAsync(clientSocket);
+                    CompletableFuture.runAsync(() -> handleConnection(clientSocket));
                 } catch (Exception e) {
                     LOGGER.log(ERROR, "err");
                 }
@@ -53,47 +52,105 @@ public class HttpServer {
         }
     }
 
-    private void handleHttpConnectionAsync(Socket clientSocket) {
-        CompletableFuture.runAsync(() -> {
-            try {
-                if (clientSocket.getInputStream().available() == 0) {
-                    LOGGER.log(TRACE, () -> "closing connection due to empty input");
-                    clientSocket.close();
-                    return;
+    private void handleConnection(Socket clientSocket) {
+        try {
+            if (clientSocket.getInputStream().available() == 0) {
+                LOGGER.log(TRACE, () -> "closing connection due to empty input");
+                clientSocket.close();
+                return;
+            }
+
+            boolean keepReading = true;
+            BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), StandardCharsets.UTF_8));
+
+            do {
+                String[] rlTokens = in.readLine().split(" ");
+                Method method = Method.valueOf(rlTokens[0]);
+                if (!SUPPORTED_HTTP_VERSION.equals(rlTokens[2])) {
+                    throw new UnsupportedProtocolException();
                 }
 
-                HttpRequest request = httpRequestParser.parse(clientSocket);
+                Map<String, String> headers = new HashMap<>();
+                String line = in.readLine();
+                while (line != null && !line.isEmpty()) {
+                    int colonIdx = line.indexOf(":");
 
-                if (!requestDispatcher.routeExists(request.getPath(), request.getMethod())){
-                    var os = clientSocket.getOutputStream();
-                    os.write(HttpResponseConstructor.constructHttpResponse(HttpStatusCode.NOT_FOUND).getBytes());
-                    os.flush();
-                    clientSocket.close();
-                    return;
+                    if (colonIdx == -1) {
+                        throw new RequestParsingException("Failed to parse header on line " + line);
+                    }
+                    headers.put(line.substring(0, colonIdx), line.substring(colonIdx + 1).trim());
+                    line = in.readLine();
                 }
 
-                HttpResponse response = httpResponseBuilder.build(clientSocket.getOutputStream());
+                int bodyLength = Optional.ofNullable(headers.get(CONTENT_LENGTH.getHeaderName())).map(Integer::parseInt).orElse(0);
+                char[] body;
+                if (bodyLength != 0) {
+                    body = new char[bodyLength];
+                    in.read(body);
+                }
 
-                requestDispatcher.dispatch(request, response);
 
-                //probably needs to be changed
-                if ("close".equals(request.getHeader(HttpHeader.CONNECTION.getHeaderName()))) {
-                    try {
-                        clientSocket.getOutputStream().close();
-                        clientSocket.close();
-                    } catch (IOException e) {
-                        LOGGER.log(ERROR, e);
+                String fullPath = rlTokens[1];
+                String path;
+                var queryParams = new HashMap<String, String>();
+
+                if (fullPath.contains(QUERY_PARAMS_START_PREFIX)) {
+                    int queryParamsPrefixIndex = fullPath.indexOf(QUERY_PARAMS_START_PREFIX);
+                    path = fullPath.substring(0, queryParamsPrefixIndex);
+                    String[] queryParamTokens = fullPath.substring(queryParamsPrefixIndex + 1).split("&");
+                    for (String queryParamToken : queryParamTokens) {
+                        String[] queryParamKeyValue = queryParamToken.split("=");
+                        queryParams.put(queryParamKeyValue[0], queryParamKeyValue[1]);
                     }
                 } else {
-                    clientSocket.setKeepAlive(true);
+                    path = fullPath;
                 }
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            } catch (ServerException e) {
-                ServerExceptionHandler.handle(clientSocket);
-            } catch (Exception e) {
-                System.out.println("Global exception" + e.getMessage());
-            }
-        });
+
+                var request = new HttpRequestImpl(
+                        method,
+                        path,
+                        fullPath,
+                        headers,
+                        queryParams
+                );
+
+                boolean closeConnection = "close".equals(request.getHeader(HttpHeader.CONNECTION.getHeaderName()));
+
+                if (closeConnection)
+                    keepReading = false;
+
+                CompletableFuture.runAsync(() -> {
+                    try {
+                        Map<String, String> responseHeaders = new HashMap<>();
+                        headers.put(HttpHeader.CONTENT_TYPE.getHeaderName(), "text/plain");
+                        String response = constructHttpResponse(
+                                OK,
+                                responseHeaders,
+                                "TEST"
+                        );
+
+                        var out = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream(), StandardCharsets.UTF_8));
+                        out.write(response);
+                        out.flush();
+
+                        if (closeConnection) {
+                            clientSocket.getOutputStream().close();
+                            clientSocket.close();
+
+                        } else {
+                            clientSocket.setKeepAlive(true);
+                        }
+                    } catch (Exception e) {
+                        throw new RuntimeException(e.getMessage());
+                    }
+                });
+            } while (keepReading);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        } catch (ServerException e) {
+            ServerExceptionHandler.handle(clientSocket);
+        } catch (Exception e) {
+            System.out.println("Global exception (%s): %s".formatted(e.getClass().getName(), e.getMessage()));
+        }
     }
 }

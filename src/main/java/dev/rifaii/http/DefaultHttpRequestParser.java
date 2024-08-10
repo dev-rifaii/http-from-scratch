@@ -1,21 +1,19 @@
 package dev.rifaii.http;
 
 import dev.rifaii.http.exception.RequestParsingException;
-import dev.rifaii.http.spec.HttpHeader;
-import dev.rifaii.http.spec.Method;
 import dev.rifaii.http.exception.UnsupportedProtocolException;
+import dev.rifaii.http.spec.Method;
 
-import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
 
 import static dev.rifaii.http.spec.HttpHeader.CONTENT_LENGTH;
-import static java.lang.Integer.parseInt;
 
 public class DefaultHttpRequestParser implements HttpRequestParser {
 
