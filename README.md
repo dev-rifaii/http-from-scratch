@@ -3,5 +3,5 @@
 - [ ] Path routing
 - [ ] Method routing
 - [ ] Request parsing
-- [ ] Persistent connection
+- [x] Persistent connection
 - [ ] Pipelining

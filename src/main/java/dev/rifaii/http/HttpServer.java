@@ -10,6 +10,7 @@ import dev.rifaii.http.spec.Method;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
@@ -54,17 +55,12 @@ public class HttpServer {
 
     private void handleConnection(Socket clientSocket) {
         try {
-            if (clientSocket.getInputStream().available() == 0) {
-                LOGGER.log(TRACE, () -> "closing connection due to empty input");
-                clientSocket.close();
-                return;
-            }
-
             boolean keepReading = true;
             BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), StandardCharsets.UTF_8));
 
             do {
-                String[] rlTokens = in.readLine().split(" ");
+                String firstLine = in.readLine();
+                String[] rlTokens = firstLine.split(" ");
                 Method method = Method.valueOf(rlTokens[0]);
                 if (!SUPPORTED_HTTP_VERSION.equals(rlTokens[2])) {
                     throw new UnsupportedProtocolException();
@@ -150,7 +146,8 @@ public class HttpServer {
         } catch (ServerException e) {
             ServerExceptionHandler.handle(clientSocket);
         } catch (Exception e) {
-            System.out.println("Global exception (%s): %s".formatted(e.getClass().getName(), e.getMessage()));
+            System.out.printf("Global exception (%s): %s%n", e.getClass().getName(), e.getMessage());
+            throw new RuntimeException(e);
         }
     }
 }
