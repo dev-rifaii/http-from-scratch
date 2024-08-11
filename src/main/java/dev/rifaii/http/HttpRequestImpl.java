@@ -16,6 +16,9 @@ public class HttpRequestImpl implements HttpRequest {
     private final Map<String, String> queryParams;
     private final byte[] body;
 
+    public HttpRequestImpl(Method method, String path, String fullPath, Map<String, String> headers, Map<String, String> queryParams, byte[] body) {
+        this(method, path, fullPath, "HTTP/1.1", headers, queryParams, body);
+    }
 
     public HttpRequestImpl(Method method, String path, String fullPath, Map<String, String> headers, Map<String, String> queryParams) {
         this(method, path, fullPath, "HTTP/1.1", headers, queryParams, null);

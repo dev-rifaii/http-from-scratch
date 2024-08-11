@@ -10,12 +10,10 @@ import dev.rifaii.http.spec.Method;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.net.SocketException;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 
 import static dev.rifaii.http.spec.HttpHeader.CONTENT_LENGTH;
 import static dev.rifaii.http.spec.HttpStatusCode.OK;
@@ -68,7 +66,7 @@ public class HttpServer {
 
                runAsync(() -> {
                     try {
-                        writeResponse(clientSocket, closeConnection);
+                        writeResponse(request, clientSocket, closeConnection);
                     } catch (IOException e) {
                         throw new RuntimeException(e.getMessage());
                     }
@@ -103,15 +101,14 @@ public class HttpServer {
             headers.put(line.substring(0, colonIdx), line.substring(colonIdx + 1).trim());
             line = in.readLine();
         }
+        System.out.println("Successfully parsed headers");
 
         int bodyLength = Optional.ofNullable(headers.get(CONTENT_LENGTH.getHeaderName())).map(Integer::parseInt).orElse(0);
-        byte[] body;
-        //                if (bodyLength != 0) {
-        //                    var bufferedInputStream = new BufferedInputStream(clientSocket.getInputStream());
-        //                    body = new byte[bodyLength];
-        ////                    bufferedInputStream.read(body);
-        //                }
-
+        char[] body = new char[bodyLength];
+        if (bodyLength != 0) {
+            in.read(body);
+        }
+        System.out.println("Successfully parsed body");
 
         String fullPath = rlTokens[1];
         String path;
@@ -128,31 +125,35 @@ public class HttpServer {
         } else {
             path = fullPath;
         }
+        System.out.println("Successfully parsed query params");
 
         return new HttpRequestImpl(
-            method,
-            path,
-            fullPath,
-            headers,
-            queryParams
+                method,
+                path,
+                fullPath,
+                headers,
+                queryParams,
+                String.valueOf(body).getBytes()
         );
     }
 
-    void writeResponse(Socket clientSocket, boolean closeConnection) throws IOException {
+    void writeResponse(HttpRequest request, Socket clientSocket, boolean closeConnection) throws IOException {
         Map<String, String> responseHeaders = new HashMap<>();
         responseHeaders.put(HttpHeader.CONTENT_TYPE.getHeaderName(), "text/plain");
         String response = constructHttpResponse(
             OK,
             responseHeaders,
-            "TEST"
+            new String(request.getBody(), StandardCharsets.UTF_8)
         );
 
+        System.out.println("Writing response to client");
         var out = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream(), StandardCharsets.UTF_8));
         out.write(response);
         out.flush();
+        System.out.println("Successfuly wrote response to client");
 
         if (closeConnection) {
-            clientSocket.getOutputStream().close();
+            request.getOutputStream().close();
             clientSocket.close();
 
         } else {
