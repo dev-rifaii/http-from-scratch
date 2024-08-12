@@ -9,6 +9,19 @@ repositories {
     mavenCentral()
 }
 
+sourceSets {
+    itest {
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+}
+
+configurations {
+    itest.extendsFrom implementation
+    itest.extendsFrom runtimeOnly
+    itestImplementation.extendsFrom testImplementation
+}
+
 dependencies {
     testImplementation platform('org.junit:junit-bom:5.10.3')
     testImplementation 'org.junit.jupiter:junit-jupiter'

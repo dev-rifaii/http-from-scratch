@@ -14,6 +14,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 import static dev.rifaii.http.spec.HttpHeader.CONTENT_LENGTH;
 import static dev.rifaii.http.spec.HttpStatusCode.OK;
@@ -26,30 +27,31 @@ public class HttpServer {
     private static final String QUERY_PARAMS_START_PREFIX = "?";
     private static final String SUPPORTED_HTTP_VERSION = "HTTP/1.1";
 
-    private final int port;
+    private int port = 80;
     private final System.Logger LOGGER = System.getLogger(HttpServer.class.getName());
+    private final ServerSocket serverSocket = new ServerSocket(port);
 
-    public HttpServer() {
+    public HttpServer() throws IOException {
         this(80);
     }
 
-    public HttpServer(int port) {
+    public HttpServer(int port) throws IOException {
         this.port = port;
     }
 
     public void startListening() throws IOException {
-        try (ServerSocket serverSocket = new ServerSocket(this.port)) {
-            LOGGER.log(INFO, "Server listening on port " + this.port);
-            while (true) {
+        LOGGER.log(INFO, "Server listening on port " + this.port);
+        runAsync(() -> {
+            while (!serverSocket.isClosed()) {
                 try {
                     Socket clientSocket = serverSocket.accept();
                     LOGGER.log(INFO, "connection received from " + clientSocket.getInetAddress());
                     runAsync(() -> handleConnection(clientSocket));
                 } catch (Exception e) {
-                    LOGGER.log(ERROR, "err");
+                    LOGGER.log(ERROR, e);
                 }
             }
-        }
+        });
     }
 
     private void handleConnection(Socket clientSocket) {
@@ -60,7 +62,7 @@ public class HttpServer {
             do {
                 var request = parseRequest(in);
 
-                boolean closeConnection = "close".equals(request.getHeader(HttpHeader.CONNECTION.getHeaderName()));
+                boolean closeConnection = "close".equalsIgnoreCase(request.getHeader(HttpHeader.CONNECTION.getHeaderName()));
                 if (closeConnection)
                     keepReading = false;
 
@@ -159,5 +161,9 @@ public class HttpServer {
         } else {
             clientSocket.setKeepAlive(true);
         }
+    }
+
+    public void stopListening() throws IOException {
+        serverSocket.close();
     }
 }
