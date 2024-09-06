@@ -2,10 +2,7 @@ package dev.rifaii.http;
 
 import dev.rifaii.http.spec.Method;
 
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.Map;
-import java.util.Optional;
 
 public class HttpRequestImpl implements HttpRequest {
 
@@ -17,6 +14,9 @@ public class HttpRequestImpl implements HttpRequest {
     private final Map<String, String> queryParams;
     private final byte[] body;
 
+    public HttpRequestImpl(Method method, String path, String fullPath, Map<String, String> headers, Map<String, String> queryParams, byte[] body) {
+        this(method, path, fullPath, "HTTP/1.1", headers, queryParams, body);
+    }
 
     public HttpRequestImpl(Method method, String path, String fullPath, Map<String, String> headers, Map<String, String> queryParams) {
         this(method, path, fullPath, "HTTP/1.1", headers, queryParams, null);
@@ -42,16 +42,6 @@ public class HttpRequestImpl implements HttpRequest {
 
     public Method getMethod() {
         return method;
-    }
-
-    @Override
-    public InputStream getInputStream() {
-        return null;
-    }
-
-    @Override
-    public OutputStream getOutputStream() {
-        return null;
     }
 
     @Override

@@ -1,99 +1,184 @@
 package dev.rifaii.http;
 
+import dev.rifaii.http.exception.RequestParsingException;
 import dev.rifaii.http.exception.ServerException;
 import dev.rifaii.http.exception.ServerExceptionHandler;
+import dev.rifaii.http.exception.UnsupportedProtocolException;
 import dev.rifaii.http.spec.HttpHeader;
-import dev.rifaii.http.spec.HttpStatusCode;
 import dev.rifaii.http.spec.Method;
-import dev.rifaii.http.util.HttpResponseConstructor;
-import dev.rifaii.util.Pair;
 
-import javax.swing.plaf.metal.MetalBorders.TableHeaderBorder;
-import javax.swing.text.html.Option;
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
+import java.util.Optional;
 
-import static java.lang.System.Logger.Level.*;
+import static dev.rifaii.http.spec.HttpHeader.CONNECTION;
+import static dev.rifaii.http.spec.HttpHeader.CONTENT_LENGTH;
+import static dev.rifaii.http.spec.HttpStatusCode.OK;
+import static dev.rifaii.http.util.HttpResponseConstructor.constructHttpResponse;
+import static java.lang.System.Logger.Level.ERROR;
+import static java.lang.System.Logger.Level.INFO;
+import static java.util.concurrent.CompletableFuture.runAsync;
 
 public class HttpServer {
 
-    private final int port;
+    private static final String QUERY_PARAMS_START_PREFIX = "?";
+    private static final String SUPPORTED_HTTP_VERSION = "HTTP/1.1";
+
     private final System.Logger LOGGER = System.getLogger(HttpServer.class.getName());
+    private final ServerSocket serverSocket;
 
-    private final HttpRequestParser httpRequestParser;
-    private final HttpResponseBuilder httpResponseBuilder;
-    private final RequestDispatcher requestDispatcher;
+    boolean requestInProgress = false;
 
-    public HttpServer() {
+    public HttpServer() throws IOException {
         this(80);
     }
 
-    public HttpServer(int port) {
-        this.port = port;
-        this.httpResponseBuilder = new HttpResponseBuilderImpl();
-        httpRequestParser = new DefaultHttpRequestParser();
-        this.requestDispatcher = new RequestDispatcherImpl(Map.of(Pair.of("/", Method.POST), new DefaultHttpHandler()));
+    public HttpServer(int port) throws IOException {
+         serverSocket = new ServerSocket(port);
     }
 
     public void startListening() throws IOException {
-        try (ServerSocket serverSocket = new ServerSocket(this.port)) {
-            LOGGER.log(INFO, "Server listening on port " + this.port);
-            while (true) {
+        var thread = new Thread(() -> {
+            while (!serverSocket.isClosed()) {
                 try {
                     Socket clientSocket = serverSocket.accept();
+                    requestInProgress = true;
                     LOGGER.log(INFO, "connection received from " + clientSocket.getInetAddress());
-                    handleHttpConnectionAsync(clientSocket);
+                    runAsync(() -> handleConnection(clientSocket));
                 } catch (Exception e) {
-                    LOGGER.log(ERROR, "err");
+                    LOGGER.log(ERROR, e);
                 }
             }
+        });
+        thread.setDaemon(true);
+        thread.start();
+    }
+
+    private void handleConnection(Socket clientSocket) {
+        try {
+            boolean keepReading = true;
+            BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), StandardCharsets.UTF_8));
+
+            do {
+                HttpRequest request = parseRequest(in);
+
+                boolean closeConnection = "close".equalsIgnoreCase(request.getHeader(CONNECTION.getHeaderName()));
+                if (closeConnection)
+                    keepReading = false;
+
+               runAsync(() -> {
+                    try {
+                        writeResponse(request, clientSocket, closeConnection);
+                        requestInProgress = false;
+                    } catch (IOException e) {
+                        throw new RuntimeException(e.getMessage());
+                    }
+                });
+            } while (keepReading);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        } catch (ServerException e) {
+            ServerExceptionHandler.handle(clientSocket);
+        } catch (Exception e) {
+            System.out.printf("Global exception (%s): %s%n", e.getClass().getName(), e.getMessage());
+            throw new RuntimeException(e);
         }
     }
 
-    private void handleHttpConnectionAsync(Socket clientSocket) {
-        CompletableFuture.runAsync(() -> {
-            try {
-                if (clientSocket.getInputStream().available() == 0) {
-                    LOGGER.log(TRACE, () -> "closing connection due to empty input");
-                    clientSocket.close();
-                    return;
-                }
+    HttpRequest parseRequest(BufferedReader in) throws IOException {
+        String firstLine = in.readLine();
+        String[] rlTokens = firstLine.split(" ");
 
-                HttpRequest request = httpRequestParser.parse(clientSocket);
+        String methodStr = rlTokens[0];
+        boolean isMethodSupported = Method.isValidMethod(methodStr);
+        Method method = isMethodSupported ? Method.valueOf(methodStr) : null;
 
-                if (!requestDispatcher.routeExists(request.getPath(), request.getMethod())){
-                    var os = clientSocket.getOutputStream();
-                    os.write(HttpResponseConstructor.constructHttpResponse(HttpStatusCode.NOT_FOUND).getBytes());
-                    os.flush();
-                    clientSocket.close();
-                    return;
-                }
+        if (!SUPPORTED_HTTP_VERSION.equals(rlTokens[2])) {
+            throw new UnsupportedProtocolException();
+        }
 
-                HttpResponse response = httpResponseBuilder.build(clientSocket.getOutputStream());
+        Map<String, String> headers = new HashMap<>();
+        String line = in.readLine();
+        while (line != null && !line.isEmpty()) {
+            int colonIdx = line.indexOf(":");
 
-                requestDispatcher.dispatch(request, response);
-
-                //probably needs to be changed
-                if ("close".equals(request.getHeader(HttpHeader.CONNECTION.getHeaderName()))) {
-                    try {
-                        clientSocket.getOutputStream().close();
-                        clientSocket.close();
-                    } catch (IOException e) {
-                        LOGGER.log(ERROR, e);
-                    }
-                } else {
-                    clientSocket.setKeepAlive(true);
-                }
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            } catch (ServerException e) {
-                ServerExceptionHandler.handle(clientSocket);
-            } catch (Exception e) {
-                System.out.println("Global exception" + e.getMessage());
+            if (colonIdx == -1) {
+                throw new RequestParsingException("Failed to parse header on line " + line);
             }
-        });
+            headers.put(line.substring(0, colonIdx), line.substring(colonIdx + 1).trim());
+            line = in.readLine();
+        }
+        System.out.println("Successfully parsed headers");
+
+        int bodyLength = Optional.ofNullable(headers.get(CONTENT_LENGTH.getHeaderName())).map(Integer::parseInt).orElse(0);
+        char[] body = new char[bodyLength];
+        if (bodyLength != 0) {
+            in.read(body);
+        }
+        System.out.println("Successfully parsed body");
+
+        String fullPath = rlTokens[1];
+        String path;
+        var queryParams = new HashMap<String, String>();
+
+        if (fullPath.contains(QUERY_PARAMS_START_PREFIX)) {
+            int queryParamsPrefixIndex = fullPath.indexOf(QUERY_PARAMS_START_PREFIX);
+            path = fullPath.substring(0, queryParamsPrefixIndex);
+            String[] queryParamTokens = fullPath.substring(queryParamsPrefixIndex + 1).split("&");
+            for (String queryParamToken : queryParamTokens) {
+                String[] queryParamKeyValue = queryParamToken.split("=");
+                queryParams.put(queryParamKeyValue[0], queryParamKeyValue[1]);
+            }
+        } else {
+            path = fullPath;
+        }
+        System.out.println("Successfully parsed query params");
+
+        return new HttpRequestImpl(
+                method,
+                path,
+                fullPath,
+                headers,
+                queryParams,
+                String.valueOf(body).getBytes()
+        );
+    }
+
+    void writeResponse(HttpRequest request, Socket clientSocket, boolean closeConnection) throws IOException {
+        Map<String, String> responseHeaders = new HashMap<>();
+        responseHeaders.put(HttpHeader.CONTENT_TYPE.getHeaderName(), "text/plain");
+        String response = constructHttpResponse(
+            OK,
+            responseHeaders,
+            new String(request.getBody(), StandardCharsets.UTF_8)
+        );
+
+        System.out.println("Writing response to client");
+        var out = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream(), StandardCharsets.UTF_8));
+        out.write(response);
+        out.flush();
+        System.out.println("Successfully wrote response to client");
+
+        if (closeConnection) {
+            clientSocket.getOutputStream().close();
+            clientSocket.close();
+
+        } else {
+            clientSocket.setKeepAlive(true);
+        }
+    }
+
+    public void stopListening() throws IOException {
+        while (requestInProgress) {}
+        serverSocket.close();
+        LOGGER.log(INFO, "Server socket closed");
     }
 }

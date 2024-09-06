@@ -20,7 +20,6 @@ public class Client {
             // Prepare the second HTTP GET request
             String request2 = "GET /another-path HTTP/1.1\r\n"
                               + "Host: 127.0.0.1\r\n"
-                              + "Connection: close\r\n"
                               + "\r\n";
 
             // Send the first request
@@ -37,6 +36,8 @@ public class Client {
                 System.out.println(responseLine);
             }
 
+            Thread.sleep(3000);
+
             // Send the second request on the same connection
             out.write(request2.getBytes());
             out.flush();
@@ -49,7 +50,8 @@ public class Client {
             }
 
             // Close the connection
-            socket.close();
+//            socket.close();
+            for (;;);
         } catch (Exception e) {
             e.printStackTrace();
         }
