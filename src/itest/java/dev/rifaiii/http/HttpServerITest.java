@@ -6,25 +6,22 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.http.HttpClient;
+import java.net.http.HttpClient.Version;
 import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
+import java.net.http.HttpRequest.BodyPublishers;
+import java.net.http.HttpResponse.BodyHandlers;
 
 public class HttpServerITest extends ITestBase {
 
     @Test
-    void test() throws URISyntaxException, IOException, InterruptedException {
-        System.setProperty("jdk.httpclient.allowRestrictedHeaders", "Connection");
-        System.out.println("TEST");
-        HttpClient httpClient = HttpClient.newHttpClient();
+    void sendMultipleRequestsOnSameConnection() throws URISyntaxException, IOException, InterruptedException {
         HttpRequest httpRequest = HttpRequest.newBuilder()
-                .POST(HttpRequest.BodyPublishers.ofString("BODYYYYYY"))
-                .header("Connection", "close")
-                .uri(new URI("http://127.0.0.1/"))
-                .build();
+            .POST(BodyPublishers.ofString("BODYYYYYY"))
+            .uri(new URI("http://127.0.0.1/"))
+            .version(Version.HTTP_1_1)
+            .build();
 
-        HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-        HttpResponse<String> secondResponse = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-        System.out.println(response.body());
+        httpClient.send(httpRequest, BodyHandlers.ofString());
+        httpClient.send(httpRequest, BodyHandlers.ofString());
     }
 }

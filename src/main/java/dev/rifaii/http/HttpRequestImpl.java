@@ -2,8 +2,6 @@ package dev.rifaii.http;
 
 import dev.rifaii.http.spec.Method;
 
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.Map;
 
 public class HttpRequestImpl implements HttpRequest {
@@ -44,16 +42,6 @@ public class HttpRequestImpl implements HttpRequest {
 
     public Method getMethod() {
         return method;
-    }
-
-    @Override
-    public InputStream getInputStream() {
-        return null;
-    }
-
-    @Override
-    public OutputStream getOutputStream() {
-        return null;
     }
 
     @Override

@@ -7,19 +7,24 @@ import dev.rifaii.http.exception.UnsupportedProtocolException;
 import dev.rifaii.http.spec.HttpHeader;
 import dev.rifaii.http.spec.Method;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 
+import static dev.rifaii.http.spec.HttpHeader.CONNECTION;
 import static dev.rifaii.http.spec.HttpHeader.CONTENT_LENGTH;
 import static dev.rifaii.http.spec.HttpStatusCode.OK;
 import static dev.rifaii.http.util.HttpResponseConstructor.constructHttpResponse;
-import static java.lang.System.Logger.Level.*;
+import static java.lang.System.Logger.Level.ERROR;
+import static java.lang.System.Logger.Level.INFO;
 import static java.util.concurrent.CompletableFuture.runAsync;
 
 public class HttpServer {
@@ -27,24 +32,25 @@ public class HttpServer {
     private static final String QUERY_PARAMS_START_PREFIX = "?";
     private static final String SUPPORTED_HTTP_VERSION = "HTTP/1.1";
 
-    private int port = 80;
     private final System.Logger LOGGER = System.getLogger(HttpServer.class.getName());
-    private final ServerSocket serverSocket = new ServerSocket(port);
+    private final ServerSocket serverSocket;
+
+    boolean requestInProgress = false;
 
     public HttpServer() throws IOException {
         this(80);
     }
 
     public HttpServer(int port) throws IOException {
-        this.port = port;
+         serverSocket = new ServerSocket(port);
     }
 
     public void startListening() throws IOException {
-        LOGGER.log(INFO, "Server listening on port " + this.port);
-        runAsync(() -> {
+        var thread = new Thread(() -> {
             while (!serverSocket.isClosed()) {
                 try {
                     Socket clientSocket = serverSocket.accept();
+                    requestInProgress = true;
                     LOGGER.log(INFO, "connection received from " + clientSocket.getInetAddress());
                     runAsync(() -> handleConnection(clientSocket));
                 } catch (Exception e) {
@@ -52,6 +58,8 @@ public class HttpServer {
                 }
             }
         });
+        thread.setDaemon(true);
+        thread.start();
     }
 
     private void handleConnection(Socket clientSocket) {
@@ -60,15 +68,16 @@ public class HttpServer {
             BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), StandardCharsets.UTF_8));
 
             do {
-                var request = parseRequest(in);
+                HttpRequest request = parseRequest(in);
 
-                boolean closeConnection = "close".equalsIgnoreCase(request.getHeader(HttpHeader.CONNECTION.getHeaderName()));
+                boolean closeConnection = "close".equalsIgnoreCase(request.getHeader(CONNECTION.getHeaderName()));
                 if (closeConnection)
                     keepReading = false;
 
                runAsync(() -> {
                     try {
                         writeResponse(request, clientSocket, closeConnection);
+                        requestInProgress = false;
                     } catch (IOException e) {
                         throw new RuntimeException(e.getMessage());
                     }
@@ -87,7 +96,11 @@ public class HttpServer {
     HttpRequest parseRequest(BufferedReader in) throws IOException {
         String firstLine = in.readLine();
         String[] rlTokens = firstLine.split(" ");
-        Method method = Method.valueOf(rlTokens[0]);
+
+        String methodStr = rlTokens[0];
+        boolean isMethodSupported = Method.isValidMethod(methodStr);
+        Method method = isMethodSupported ? Method.valueOf(methodStr) : null;
+
         if (!SUPPORTED_HTTP_VERSION.equals(rlTokens[2])) {
             throw new UnsupportedProtocolException();
         }
@@ -152,10 +165,10 @@ public class HttpServer {
         var out = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream(), StandardCharsets.UTF_8));
         out.write(response);
         out.flush();
-        System.out.println("Successfuly wrote response to client");
+        System.out.println("Successfully wrote response to client");
 
         if (closeConnection) {
-            request.getOutputStream().close();
+            clientSocket.getOutputStream().close();
             clientSocket.close();
 
         } else {
@@ -164,6 +177,8 @@ public class HttpServer {
     }
 
     public void stopListening() throws IOException {
+        while (requestInProgress) {}
         serverSocket.close();
+        LOGGER.log(INFO, "Server socket closed");
     }
 }

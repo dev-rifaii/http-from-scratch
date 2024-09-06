@@ -2,11 +2,11 @@ package dev.rifaii.http;
 
 import dev.rifaii.http.spec.HttpHeader;
 import dev.rifaii.http.spec.Method;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import java.io.*;
-import java.net.Socket;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.StringReader;
 import java.util.Arrays;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
