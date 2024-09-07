@@ -1,6 +1,7 @@
 package dev.rifaiii.http;
 
 import dev.rifaiii.ITestBase;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -21,7 +22,10 @@ public class HttpServerITest extends ITestBase {
             .version(Version.HTTP_1_1)
             .build();
 
-        httpClient.send(httpRequest, BodyHandlers.ofString());
-        httpClient.send(httpRequest, BodyHandlers.ofString());
+        String responseBody1 = httpClient.send(httpRequest, BodyHandlers.ofString()).body();
+        String responseBody2 = httpClient.send(httpRequest, BodyHandlers.ofString()).body();
+
+        Assertions.assertEquals("HELLO WORLD\r\n", responseBody1);
+        Assertions.assertEquals("HELLO WORLD\r\n", responseBody2);
     }
 }

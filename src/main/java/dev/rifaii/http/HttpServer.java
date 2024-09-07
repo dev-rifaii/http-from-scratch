@@ -4,6 +4,9 @@ import dev.rifaii.http.exception.RequestParsingException;
 import dev.rifaii.http.exception.ServerException;
 import dev.rifaii.http.exception.ServerExceptionHandler;
 import dev.rifaii.http.exception.UnsupportedProtocolException;
+import dev.rifaii.http.path.HttpBody;
+import dev.rifaii.http.path.HttpPath;
+import dev.rifaii.http.path.DefaultPathRegistry;
 import dev.rifaii.http.spec.HttpHeader;
 import dev.rifaii.http.spec.Method;
 
@@ -15,7 +18,9 @@ import java.io.OutputStreamWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -34,16 +39,24 @@ public class HttpServer {
 
     private final System.Logger LOGGER = System.getLogger(HttpServer.class.getName());
     private final ServerSocket serverSocket;
+    private final DefaultPathRegistry defaultPathRegistry = new DefaultPathRegistry();
 
     boolean requestInProgress = false;
 
     public HttpServer() throws IOException {
-        this(80);
+        this(80, Collections.emptyList());
     }
 
-    public HttpServer(int port) throws IOException {
-         serverSocket = new ServerSocket(port);
+    public HttpServer(List<HttpPath> paths) throws IOException {
+        this(80, paths);
     }
+
+    public HttpServer(int port, List<HttpPath> paths) throws IOException {
+         serverSocket = new ServerSocket(port);
+         paths.forEach(defaultPathRegistry::register);
+    }
+
+
 
     public void startListening() throws IOException {
         var thread = new Thread(() -> {
@@ -58,7 +71,6 @@ public class HttpServer {
                 }
             }
         });
-        thread.setDaemon(true);
         thread.start();
     }
 
@@ -155,10 +167,11 @@ public class HttpServer {
     void writeResponse(HttpRequest request, Socket clientSocket, boolean closeConnection) throws IOException {
         Map<String, String> responseHeaders = new HashMap<>();
         responseHeaders.put(HttpHeader.CONTENT_TYPE.getHeaderName(), "text/plain");
+        HttpBody body = defaultPathRegistry.dispatch(request);
         String response = constructHttpResponse(
             OK,
             responseHeaders,
-            new String(request.getBody(), StandardCharsets.UTF_8)
+            new String(body.bytes(), body.charset()) //Temporarily assuming all responses are strings
         );
 
         System.out.println("Writing response to client");

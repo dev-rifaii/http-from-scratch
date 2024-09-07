@@ -4,5 +4,5 @@ import dev.rifaii.http.HttpRequest;
 
 public interface HttpRequestHandler {
 
-    byte[] handle(HttpRequest request);
+    HttpBody handle(HttpRequest request);
 }
