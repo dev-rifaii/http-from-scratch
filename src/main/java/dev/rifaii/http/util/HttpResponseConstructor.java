@@ -23,7 +23,7 @@ public class HttpResponseConstructor {
         var sb = new StringBuilder();
         //e.g: "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nBody"
         if (body != null)
-            headers.put(HttpHeader.CONTENT_LENGTH.getHeaderName(), String.valueOf(body.length() + CR_NL.length()));
+            headers.put(HttpHeader.CONTENT_LENGTH.getHeaderName(), String.valueOf(body.length()));
 
         String headersMap = mapToHeaders(headers);
 
@@ -36,14 +36,10 @@ public class HttpResponseConstructor {
                 .append(CR_NL);
 
         if (body != null) {
-              sb.append(body)
-//                .append(CR_NL)
-              ;
+              sb.append(body);
         }
 
-        String str = sb.toString();
-        sb.setLength(0);
-        return str;
+        return sb.toString();
     }
 
     private static String mapToHeaders(Map<String, String> headers) {

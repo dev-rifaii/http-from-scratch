@@ -153,6 +153,7 @@ public class HttpServer {
             path = fullPath;
         }
         System.out.println("Successfully parsed query params");
+        System.out.printf("Request is going to %s%n", path);
 
         return new HttpRequestImpl(
                 method,
