@@ -43,7 +43,7 @@ public class PipeliningITest extends ITestBase {
                 "/wait",
                 (request) -> {
                     try {
-                        Thread.sleep(2000);
+                        Thread.sleep(1000);
                     } catch (InterruptedException e) {
                         throw new RuntimeException(e);
                     }
@@ -54,42 +54,25 @@ public class PipeliningITest extends ITestBase {
     }
 
     @Test
-    void sendMultipleRequestsOnSameConnection() throws URISyntaxException, IOException, InterruptedException, ExecutionException {
-        var before = LocalTime.now();
+    void sendMultipleRequestsOnSameConnection() throws URISyntaxException, InterruptedException, ExecutionException {
         HttpRequest httpRequest = HttpRequest.newBuilder()
-            .POST(BodyPublishers.ofString("LOREM"))
-            .uri(new URI("http://127.0.0.1/wait"))
-            .version(Version.HTTP_1_1)
-            .build();
-
-        HttpRequest httpRequest2 = HttpRequest.newBuilder()
             .POST(BodyPublishers.ofString("LOREM"))
             .uri(new URI("http://127.0.0.1/wait2"))
             .version(Version.HTTP_1_1)
             .build();
 
-        CompletableFuture<HttpResponse<String>> future1 = CompletableFuture.supplyAsync(() -> {
-            try {
-                return httpClient.send(httpRequest, BodyHandlers.ofString());
-            } catch (IOException | InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-        });
+        HttpRequest httpRequest2 = HttpRequest.newBuilder()
+            .POST(BodyPublishers.ofString("LOREM"))
+            .uri(new URI("http://127.0.0.1/wait"))
+            .version(Version.HTTP_1_1)
+            .build();
 
-        CompletableFuture<HttpResponse<String>> future2 = CompletableFuture.supplyAsync(() -> {
-            try {
-                return httpClient.send(httpRequest2, BodyHandlers.ofString());
-            } catch (IOException | InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-        });
+        CompletableFuture<HttpResponse<String>> future1 = httpClient.sendAsync(httpRequest, BodyHandlers.ofString());
+        Thread.sleep(500);
+        CompletableFuture<HttpResponse<String>> future2 = httpClient.sendAsync(httpRequest2, BodyHandlers.ofString());
 
-        CompletableFuture.allOf(future1, future2).join();
-
-        var after = LocalTime.now();
-        Assertions.assertEquals("DONE SLEEPING", future1.get().body());
-        Assertions.assertEquals("DONE SLEEPING2", future2.get().body());
-//        Assertions.assertTrue(Duration.between(before, after).toSeconds() < 3);
+        Assertions.assertEquals("DONE SLEEPING2", future1.get().body());
+        Assertions.assertEquals("DONE SLEEPING", future2.get().body());
     }
 
 }

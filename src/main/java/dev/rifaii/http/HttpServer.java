@@ -179,7 +179,7 @@ public class HttpServer {
         var out = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream(), StandardCharsets.UTF_8));
         out.write(response);
         out.flush();
-        System.out.println("Successfully wrote response to client");
+        System.out.println("Successfully wrote response to client for path " + request.getPath());
 
         if (closeConnection) {
             clientSocket.getOutputStream().close();
