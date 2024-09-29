@@ -7,6 +7,7 @@ import dev.rifaii.http.exception.UnsupportedProtocolException;
 import dev.rifaii.http.path.HttpBody;
 import dev.rifaii.http.path.HttpPath;
 import dev.rifaii.http.path.DefaultPathRegistry;
+import dev.rifaii.http.path.PathRegistry;
 import dev.rifaii.http.spec.HttpHeader;
 import dev.rifaii.http.spec.Method;
 
@@ -39,7 +40,7 @@ public class HttpServer {
 
     private final System.Logger LOGGER = System.getLogger(HttpServer.class.getName());
     private final ServerSocket serverSocket;
-    private final DefaultPathRegistry defaultPathRegistry = new DefaultPathRegistry();
+    private final PathRegistry pathRegistry = new DefaultPathRegistry();
 
     boolean requestInProgress = false;
 
@@ -53,7 +54,7 @@ public class HttpServer {
 
     public HttpServer(int port, List<HttpPath> paths) throws IOException {
          serverSocket = new ServerSocket(port);
-         paths.forEach(defaultPathRegistry::register);
+         paths.forEach(pathRegistry::register);
     }
 
 
@@ -168,7 +169,7 @@ public class HttpServer {
     void writeResponse(HttpRequest request, Socket clientSocket, boolean closeConnection) throws IOException {
         Map<String, String> responseHeaders = new HashMap<>();
         responseHeaders.put(HttpHeader.CONTENT_TYPE.getHeaderName(), "text/plain");
-        HttpBody body = defaultPathRegistry.dispatch(request);
+        HttpBody body = pathRegistry.dispatch(request);
         String response = constructHttpResponse(
             OK,
             responseHeaders,

@@ -7,7 +7,6 @@ import dev.rifaiii.ITestBase;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.http.HttpClient.Version;
@@ -15,7 +14,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
-import java.time.LocalTime;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -68,7 +66,7 @@ public class PipeliningITest extends ITestBase {
             .build();
 
         CompletableFuture<HttpResponse<String>> future1 = httpClient.sendAsync(httpRequest, BodyHandlers.ofString());
-        Thread.sleep(500);
+//        Thread.sleep(500);
         CompletableFuture<HttpResponse<String>> future2 = httpClient.sendAsync(httpRequest2, BodyHandlers.ofString());
 
         Assertions.assertEquals("DONE SLEEPING2", future1.get().body());
