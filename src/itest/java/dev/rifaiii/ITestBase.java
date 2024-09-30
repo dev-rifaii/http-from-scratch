@@ -25,9 +25,6 @@ public abstract class ITestBase {
             throw new RuntimeException(e);
         }
     }
-    static {
-
-    }
 
     @AfterEach
     void afterAll() throws IOException {

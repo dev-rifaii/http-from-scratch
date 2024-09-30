@@ -12,17 +12,19 @@ public class DefaultPathRegistry implements PathRegistry {
 
     private final Map<String, Map<Method, HttpRequestHandler>> registry = new ConcurrentHashMap<>();
 
-    public void register(HttpPath path) {
-        if (!PathMatcher.isValidPath(path.getPath())) {
-            throw new IllegalArgumentException("Invalid path: " + path.getPath());
-        }
-        registry.put(path.getPath(), Map.of(path.getMethod(), path.getHttpRequestHandler()));
+    public void register(HttpPath httpPath) {
+        if (!PathMatcher.isValidPath(httpPath.getPath()))
+            throw new IllegalArgumentException("Invalid path: " + httpPath.getPath());
+        if (registry.get(httpPath.getPath()) != null && registry.get(httpPath.getPath()).get(httpPath.getMethod()) != null)
+            throw new IllegalStateException("Path " + httpPath.getPath() + " is already registered.");
+
+        registry.put(httpPath.getPath(), Map.of(httpPath.getMethod(), httpPath.getHttpRequestHandler()));
     }
 
     public HttpBody dispatch(HttpRequest httpRequest) {
         Optional<Map<Method, HttpRequestHandler>> methodsHandlers = registry.keySet()
             .stream()
-            .filter(path -> getRegexValidPath(path).matches(httpRequest.getPath()))
+            .filter(path -> httpRequest.getPath().matches(getRegexValidPath(path)))
             .findFirst()
             .map(registry::get);
 

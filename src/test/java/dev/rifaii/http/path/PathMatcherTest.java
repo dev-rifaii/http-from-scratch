@@ -18,6 +18,7 @@ class PathMatcherTest {
     static Stream<Arguments> pathsProvider() {
         return Stream.of(
             // Valid paths
+            Arguments.of("/", true),
             Arguments.of("/users", true),
             Arguments.of("/products/123", true),
             Arguments.of("/categories/books", true),

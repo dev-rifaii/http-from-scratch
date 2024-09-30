@@ -25,6 +25,8 @@ configurations {
 dependencies {
     testImplementation platform('org.junit:junit-bom:5.10.3')
     testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation 'org.apache.httpcomponents.client5:httpclient5:5.4'
+    testImplementation 'org.slf4j:slf4j-simple:2.0.16'
 }
 
 test {
