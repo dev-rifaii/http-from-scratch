@@ -1,5 +1,7 @@
 package dev.rifaii.http;
 
+import dev.rifaii.http.path.HttpBody;
+import dev.rifaii.http.path.HttpPath;
 import dev.rifaii.http.spec.HttpHeader;
 import dev.rifaii.http.spec.Method;
 import org.junit.jupiter.api.Test;
@@ -8,13 +10,20 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.StringReader;
 import java.util.Arrays;
+import java.util.List;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class HttpServerTest {
 
-    HttpServer server = new HttpServer();
+    private final HttpServer server = new HttpServer(
+        List.of(new HttpPath(Method.POST, "/", request -> new HttpBody("Test".getBytes(UTF_8), UTF_8)))
+    );
+
+    public HttpServerTest() throws IOException {
+    }
 
     @Test
     void parseRequest_ParsesRequestSuccessfully_GivenValidInput() throws IOException {
