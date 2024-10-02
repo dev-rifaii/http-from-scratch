@@ -1,7 +1,8 @@
 package dev.rifaii.http.path;
 
 import dev.rifaii.http.HttpRequest;
-import dev.rifaii.http.exception.PathNotFoundException;
+import dev.rifaii.http.exception.DefinedErrorException;
+import dev.rifaii.http.spec.HttpStatusCode;
 import dev.rifaii.http.spec.Method;
 
 import java.util.Map;
@@ -29,11 +30,12 @@ public class DefaultPathRegistry implements PathRegistry {
             .map(registry::get);
 
         if (methodsHandlers.isEmpty()) {
-            throw new PathNotFoundException("Path %s not found".formatted(httpRequest.getPath()));
+            throw new DefinedErrorException(HttpStatusCode.NOT_FOUND);
         }
 
         return methodsHandlers.map(methodHandler -> methodHandler.get(httpRequest.getMethod()))
-            .orElseThrow(RuntimeException::new)
+            //TODO: replace with a better exception
+            .orElseThrow(() -> new DefinedErrorException(HttpStatusCode.METHOD_NOT_ALLOWED))
             .handle(httpRequest);
     }
 

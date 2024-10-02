@@ -12,6 +12,7 @@ import java.util.List;
 public abstract class ITestBase {
 
     protected final HttpClient httpClient = HttpClient.newHttpClient();
+    protected final String DEFAULT_SERVER_HOST = "http://127.0.0.1";
 
     static HttpServer server;
 

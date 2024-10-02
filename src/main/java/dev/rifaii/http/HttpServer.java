@@ -1,15 +1,13 @@
 package dev.rifaii.http;
 
-import dev.rifaii.http.exception.RequestParsingException;
-import dev.rifaii.http.exception.ServerException;
-import dev.rifaii.http.exception.ServerExceptionHandler;
-import dev.rifaii.http.exception.UnsupportedProtocolException;
+import dev.rifaii.http.exception.DefinedErrorException;
+import dev.rifaii.http.path.DefaultPathRegistry;
 import dev.rifaii.http.path.HttpBody;
 import dev.rifaii.http.path.HttpPath;
-import dev.rifaii.http.path.DefaultPathRegistry;
 import dev.rifaii.http.path.PathRegistry;
 import dev.rifaii.http.spec.HttpHeader;
 import dev.rifaii.http.spec.Method;
+import dev.rifaii.http.util.HttpResponseConstructor;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -25,11 +23,12 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.PriorityQueue;
 import java.util.Queue;
 
 import static dev.rifaii.http.spec.HttpHeader.CONNECTION;
 import static dev.rifaii.http.spec.HttpHeader.CONTENT_LENGTH;
+import static dev.rifaii.http.spec.HttpStatusCode.BAD_REQUEST;
+import static dev.rifaii.http.spec.HttpStatusCode.HTTP_VERSION_NOT_SUPPORTED;
 import static dev.rifaii.http.spec.HttpStatusCode.OK;
 import static dev.rifaii.http.util.HttpResponseConstructor.constructHttpResponse;
 import static java.lang.System.Logger.Level.ERROR;
@@ -61,8 +60,6 @@ public class HttpServer {
          serverSocket = new ServerSocket(port);
          paths.forEach(pathRegistry::register);
     }
-
-
 
     public void startListening() throws IOException {
         var thread = new Thread(() -> {
@@ -99,7 +96,7 @@ public class HttpServer {
 
                runAsync(() -> {
                     try {
-                        writeResponse(request, clientSocket, closeConnection);
+                        dispatchRequest(request, clientSocket, closeConnection);
                         requestInProgress = false;
                     } catch (IOException e) {
                         throw new RuntimeException(e.getMessage());
@@ -108,9 +105,14 @@ public class HttpServer {
             } while (keepReading);
         } catch (IOException e) {
             throw new RuntimeException(e);
-        } catch (ServerException e) {
-            ServerExceptionHandler.handle(clientSocket);
-        } catch (Exception e) {
+        } catch (DefinedErrorException e) {
+            try {
+                clientSocket.getOutputStream().write(HttpResponseConstructor.constructHttpResponse(BAD_REQUEST).getBytes());
+            } catch (Exception ex) {
+                LOGGER.log(ERROR, ex);
+            }
+        }
+        catch (Exception e) {
             LOGGER.log(ERROR, e);
             throw new RuntimeException(e);
         }
@@ -129,7 +131,7 @@ public class HttpServer {
         Method method = isMethodSupported ? Method.valueOf(methodStr) : null;
 
         if (!SUPPORTED_HTTP_VERSION.equals(rlTokens[2])) {
-            throw new UnsupportedProtocolException();
+            throw new DefinedErrorException(HTTP_VERSION_NOT_SUPPORTED);
         }
 
         Map<String, String> headers = new HashMap<>();
@@ -138,7 +140,7 @@ public class HttpServer {
             int colonIdx = line.indexOf(":");
 
             if (colonIdx == -1) {
-                throw new RequestParsingException("Failed to parse header on line " + line);
+                throw new DefinedErrorException(BAD_REQUEST);
             }
             headers.put(line.substring(0, colonIdx), line.substring(colonIdx + 1).trim());
             line = in.readLine();
@@ -180,7 +182,7 @@ public class HttpServer {
         );
     }
 
-    void writeResponse(HttpRequest request, Socket clientSocket, boolean closeConnection) throws IOException {
+    void dispatchRequest(HttpRequest request, Socket clientSocket, boolean closeConnection) throws IOException {
         while (pipeliningPool.get(clientSocket).peek() != request) {
             LOGGER.log(TRACE, "Waiting previous request to finish processing");
             try {
@@ -191,12 +193,22 @@ public class HttpServer {
         }
         Map<String, String> responseHeaders = new HashMap<>();
         responseHeaders.put(HttpHeader.CONTENT_TYPE.getHeaderName(), "text/plain");
-        HttpBody body = pathRegistry.dispatch(request);
-        String response = constructHttpResponse(
-            OK,
-            responseHeaders,
-            new String(body.bytes(), body.charset()) //Temporarily assuming all responses are strings
-        );
+        String response;
+        try {
+            HttpBody body = pathRegistry.dispatch(request);
+            response = constructHttpResponse(
+                OK,
+                responseHeaders,
+                new String(body.bytes(), body.charset()) //Temporarily assuming all responses are strings
+            );
+        } catch (DefinedErrorException e) {
+            LOGGER.log(ERROR, e);
+            response = constructHttpResponse(
+                e.getStatusCode(),
+                responseHeaders,
+                e.getStatusCode().getDescription()
+            );
+        }
 
         System.out.printf("Writing response to client for path %s%n", request.getFullPath());
         var out = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream(), StandardCharsets.UTF_8));
